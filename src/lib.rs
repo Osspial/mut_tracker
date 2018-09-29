@@ -1,18 +1,21 @@
 use std::ops::{Deref, DerefMut};
 use std::cell::Cell;
+use std::marker::PhantomData;
 
 #[derive(Debug)]
-pub struct MutTracker<T> {
+pub struct MutTracker<T, K> {
+    value: T,
     mutated: Cell<bool>,
-    value: T
+    _key: PhantomData<K>
 }
 
-impl<T> MutTracker<T> {
+impl<T, K> MutTracker<T, K> {
     #[inline(always)]
-    pub fn new(value: T) -> MutTracker<T> {
+    pub fn new(value: T) -> MutTracker<T, K> {
         MutTracker {
+            value,
             mutated: Cell::new(true),
-            value
+            _key: PhantomData
         }
     }
 
@@ -22,15 +25,22 @@ impl<T> MutTracker<T> {
     }
 
     /// Reset the "was mutated" flag to `false`.
-    ///
-    /// This is unsafe because unsafe code is allowed to depend on this value being handled correctly.
     #[inline(always)]
-    pub unsafe fn reset_was_mutated(this: &Self) {
+    pub fn reset_was_mutated(this: &Self, _key: K) {
         this.mutated.set(false)
+    }
+
+    #[inline(always)]
+    pub fn change_key<NK>(this: Self) -> MutTracker<T, NK> {
+        MutTracker {
+            value: this.value,
+            mutated: this.mutated,
+            _key: PhantomData
+        }
     }
 }
 
-impl<T> Deref for MutTracker<T> {
+impl<T, K> Deref for MutTracker<T, K> {
     type Target = T;
 
     #[inline(always)]
@@ -39,7 +49,7 @@ impl<T> Deref for MutTracker<T> {
     }
 }
 
-impl<T> DerefMut for MutTracker<T> {
+impl<T, K> DerefMut for MutTracker<T, K> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         self.mutated.set(true);
@@ -47,9 +57,9 @@ impl<T> DerefMut for MutTracker<T> {
     }
 }
 
-impl<T: Clone> Clone for MutTracker<T> {
+impl<T: Clone, K> Clone for MutTracker<T, K> {
     #[inline(always)]
-    fn clone(&self) -> MutTracker<T> {
+    fn clone(&self) -> MutTracker<T, K> {
         MutTracker::new(self.value.clone())
     }
 
@@ -60,9 +70,9 @@ impl<T: Clone> Clone for MutTracker<T> {
     }
 }
 
-impl<T> From<T> for MutTracker<T> {
+impl<T, K> From<T> for MutTracker<T, K> {
     #[inline(always)]
-    fn from(t: T) -> MutTracker<T> {
+    fn from(t: T) -> MutTracker<T, K> {
         MutTracker::new(t)
     }
 }
